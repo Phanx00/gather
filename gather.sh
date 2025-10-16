@@ -80,9 +80,9 @@ exit_abnormal() {
 }
 
 update_variable() {
-    mkdir "$dir_name/scope/"
-    mkdir "$dir_name/scans/"
-    mkdir "$dir_name/nmap/"
+    mkdir -p "$dir_name/scope/"
+    mkdir -p "$dir_name/scans/"
+    mkdir -p "$dir_name/nmap/"
 
     katana_result="katana_result.txt" # katana static finding
     targets=$dir_name/scope/target.txt # working file
@@ -479,12 +479,25 @@ active() {
 
 
 domain() {
-    cat "$domain" > $dns_result
+    echo -e "${YELLOW}[-] Avvio scansione per domini dal file:${NC} ${CYAN}$domain${NC}"
+    cat "$domain" > "$dns_result"
+
     if [[ "$s_flag" = true ]]; then
-       search_subdomain
+        search_subdomain
     else
-        httpx -l "$domain" --silent -sr -srd $response > $live_target 
+        echo -e "${YELLOW}[-] Verifica domini con httpx${NC}"
+        httpx -l "$domain" --silent -sr -srd "$response" > "$live_target"
     fi
+
+    if [[ -s "$live_target" ]]; then
+        echo -e "${YELLOW}[-] Generazione file targets da live_target${NC}"
+        # Estrae dominio/host dallo schema completo (es. https://example.com → example.com)
+        cat "$live_target" | awk -F/ '{print $3}' | sort -u > "$targets"
+        echo -e "${GREEN}[+] File targets creato:${NC} ${CYAN}$targets${NC}"
+    else
+        echo -e "${RED}[!] Nessun target vivo trovato con httpx${NC}"
+    fi
+
     statics_enum
     screenshot
     secret_check
