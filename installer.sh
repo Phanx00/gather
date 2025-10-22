@@ -39,7 +39,7 @@ cd .
 
 #pipx install git+https://github.com/maurosoria/dirsearch.git 
 pipx install git+https://github.com/GerbenJavado/LinkFinder.git --include-deps   
-pipx install git+https://github.com/angelopassaro/SecretFinder
+pipx install git+https://github.com/angelopassaro/SecretFinder --include-deps
 
 
 
