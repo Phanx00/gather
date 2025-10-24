@@ -21,6 +21,8 @@ sudo mv ~/go/bin/gowitness /usr/local/bin/
 go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest
 sudo mv ~/go/bin/urlfinder /usr/local/bin/
 
+export GITHUB_TEMPLATE_REPO=topscoder/nuclei-wordfence-cve
+nuclei -update-templates
 
 
 curl -LO https://github.com/findomain/findomain/releases/latest/download/findomain-linux.zip
