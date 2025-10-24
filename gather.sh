@@ -107,7 +107,7 @@ update_variable() {
     scope=$dir_name/scope
     nmap=$dir_name/nmap
 
-    # crea file resolver default se non esiste (sicuro e non tocca /etc)
+    # crea file resolver default se non esiste
     if [ ! -f "$dir_name/$RESOLVERS_FILENAME" ]; then
         cat > "$dir_name/$RESOLVERS_FILENAME" <<EOF
 1.1.1.1
@@ -118,36 +118,27 @@ EOF
     fi
 }
 
-# -------------------------
-# Funzioni DNS-safe
-# -------------------------
 
-# throttled_dnsx: esegue httpx + dnsx in modalità 'rate-limited' per evitare di saturare il resolver locale.
-# Uso: throttled_dnsx input_list output_file
 throttled_dnsx() {
     local input_list="$1"
     local out="$2"
     local tmp_hosts
     tmp_hosts=$(mktemp)
 
-    # Prendi hosts via httpx per normalizzare URL (se input è lista di url/domains)
-    # Non fallire se httpx non è installato — fallback a cat
+
     if command -v httpx >/dev/null 2>&1; then
-        # USA PROXY_ARG
         sort -u "$input_list" | httpx $PROXY_ARG -silent > "$tmp_hosts"
     else
         sort -u "$input_list" > "$tmp_hosts"
     fi
 
-    # split in chunk per evitare di lanciare mille processi tutti insieme
+  
     split_prefix="$dir_name/dns_chunk_"
     split -l $DNS_CHUNK_SIZE "$tmp_hosts" "$split_prefix"
 
-    # processa ogni chunk con xargs limitando concorrenza, poi pausa breve
+    
     for chunk in ${split_prefix}*; do
         [ -f "$chunk" ] || continue
-        # ogni riga -> una chiamata dnsx, concorrente fino a DNS_CONCURRENCY (xargs -P)
-        # usiamo bash -c così usiamo la variabile risolutori locale
         RESOLVERS="$dir_name/$RESOLVERS_FILENAME" OUT="$out" \
         cat "$chunk" | xargs -n1 -P $DNS_CONCURRENCY -I{} bash -c \
         'echo "{}" | dnsx -silent -a -resp -r "$RESOLVERS" >> "$OUT" 2>/dev/null || true'
@@ -155,11 +146,10 @@ throttled_dnsx() {
         sleep $DNS_PAUSE
     done
 
-    # cleanup
     rm -f ${split_prefix}* "$tmp_hosts" 2>/dev/null || true
 }
 
-# safe_ptr: esegue PTR (reverse) in modo sicuro (unica chiamata, con resolver dedicato)
+
 safe_ptr() {
     local ip="$1"
     local out="$2"
@@ -168,9 +158,6 @@ safe_ptr() {
     echo "$ip" | dnsx -silent -resp-only -ptr -r "$resolvers" >> "$out" 2>> $log || true
 }
 
-# -------------------------
-# Funzioni pre-esistenti (con piccole sostituzioni dove usavano dnsx direttamente)
-# -------------------------
 
 check_input_type() {
     local input=$1
@@ -317,9 +304,7 @@ statics_enum() {
     for url in $(cat $live_target); do
         local result_katana="$scans/${url#*//}/$katana_result"
         mkdir -p "$scans/${url#*//}"
-        # USA PROXY_ARG
         katana $PROXY_ARG -silent -u $url  -d 5 -jc -kf all -fx -xhr -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg > $result_katana 2>> $log || true
-        # USA PROXY_ARG
         urlfinder $PROXY_ARG -silent -d $url >> $result_katana 2>> $log || true
     done
     echo -e "${GREEN}[+] Statics enumeration completed. Result saved in:${NC} ${CYAN} $scans ${NC}"
@@ -359,7 +344,6 @@ retrive_params(){
         local temp=$dir_name/temp.tmp
         local targets_local=$scans/${url#*//}/$targets_url
 
-        # USA PROXY_ARG
         katana $PROXY_ARG --silent -f qurl -iqp -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -u "$url" -fx > "$targets_local"
         
         # paramspider usa --proxy
@@ -384,15 +368,10 @@ nuclei_check() {
      nuclei $PROXY_ARG  --silent -ut >/dev/null 2>>$log || true
      while IFS= read -r url; do
         echo -e "${YELLOW}[-] Start enumeration for:${NC}${CYAN}$url${NC}"
-        # USA PROXY_ARG
         nuclei $PROXY_ARG --silent -fr -t technologies -u "$url"  -nc > $scans/${url#*//}/$technologies 2>>$log || true
-        # USA PROXY_ARG
         nuclei $PROXY_ARG --silent -fr -t cves -u "$url"  -nc > $scans/${url#*//}/$cves 2>>$log || true
-        # USA PROXY_ARG
         nuclei $PROXY_ARG --silent -fr -id http-missing-security-headers -u "$url" -nc > $scans/${url#*//}/$nuclei_headers 2>>$log || true
-        # USA PROXY_ARG
         nuclei $PROXY_ARG --silent -fr -t takeovers -u "$url" -nc > $scans/${url#*//}/$takeover 2>>$log || true
-        # USA PROXY_ARG
         nuclei $PROXY_ARG --silent -fr -t github/topscoder/nuclei-wordfence-cve  -u "$url" -nc > $scans/${url#*//}/$wp 2>>$log || true
         echo -e "${YELLOW}[+] Nuclei enumeration completed for ${CYAN}$url${NC}.${YELLOW}\nResults saved in:${NC}${CYAN}\n$scans/${url#*//}/$technologies\n$scans/${url#*//}/$cves\n$scans/${url#*//}/$nuclei_vuln\n${CYAN}$scans/${url#*//}/$takeover\n$scans/${url#*//}/$nuclei_headers\n${NC}"
     done < "$live_target"
@@ -404,7 +383,6 @@ dalfox_check(){
     for target in $(ls $scans);do
         if [[ -s $scans/$target/$targets_url ]]; then
         echo -e "${YELLOW}[-] Start XSS check with Dalfox for ${NC}${CYAN}$target${NC}"
-        # dalfox usa --proxy
         local dalfox_proxy=""
         if [[ -n "$PROXY" ]]; then
             dalfox_proxy="--proxy $PROXY"
@@ -435,7 +413,6 @@ secret_check(){
     for dir in $(ls $scans);do
         echo -e "${YELLOW}[-] Start secrets finding for: ${NC}${CYAN}$dir${NC}"
         local temp=$scans/$dir/temp.tmp
-        # USA PROXY_ARG
         katana $PROXY_ARG -u $scans/$dir/$katana_result --silent -em js -d 5 -fx -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg > $temp || true
         sort -u $temp > $scans/$dir/$statics
         echo "" > $temp
@@ -451,7 +428,6 @@ secret_check(){
             mkdir -p $scans/$dir/findings
             c=1
             
-            # secretfinder usa --proxy
             local sf_proxy=""
             if [[ -n "$PROXY" ]]; then
                 sf_proxy="--proxy $PROXY"
@@ -475,13 +451,10 @@ secret_check(){
             fi
         rm -f "$temp"
         echo -e "${YELLOW}[-] Start secrets finding with nuclei for ${CYAN}$dir${NC}"
-        # USA PROXY_ARG
         nuclei $PROXY_ARG -t javascript/enumeration -nc -u $dir --silent > $scans/$dir/$nuclei_findings 2>>$log || true
         if [[ -n "$domain" ]];then
-            # USA PROXY_ARG
             nuclei $PROXY_ARG -t JSA -nc  -u $dir --silent | grep "PII" | grep -v "\"\""  >> $scans/$dir/$nuclei_findings || true
         else
-            # USA PROXY_ARG
             nuclei $PROXY_ARG -t JSA -u -nc $dir --silent | grep "PII" | grep -v "\"\""  >> $scans/$dir/$nuclei_findings || true
         fi
         echo -e "${GREEN}[+] Secret findings completed for ${CYAN}$dir${NC}.${GREEN} Results saved in:${NC}${CYAN}$scans/$dir/$nuclei_findings${NC} ${GREEN}and${NC} ${CYAN}$scans/$dir/$link${NC}"
@@ -495,13 +468,11 @@ dir_search() {
     echo -e "${YELLOW}[-] Start directory enumeration${NC}"
     if [ -n "$domain" ];then
         if [[ "$s_flag" = false ]]; then
-            # USA PROXY_ARG
             httpx $PROXY_ARG -l $targets --silent -srd $response > $live_target
         fi
     fi
 
     while IFS= read -r url; do
-        # dirsearch usa --proxy
         local ds_proxy=""
         if [[ -n "$PROXY" ]]; then
             ds_proxy="--proxy $PROXY"
@@ -527,7 +498,6 @@ screenshot() {
 
 mapper() {
     echo -e "${YELLOW}[-] Mapping vulnerabilities ${NC}"
-    # USA PROXY_ARG con httpx
     awk -F'.' '{print $(NF-1)}' $(cat $target | httpx $PROXY_ARG --silent ) | sort | uniq > $domains
     for d in $(cat $domains);do
         misconfig-mapper -target $d -service "*"  | grep -v "\[-\]" >> $mapping
@@ -569,7 +539,6 @@ domain() {
         search_subdomain
     else
         echo -e "${YELLOW}[-] Verifica domini con httpx${NC}"
-        # USA PROXY_ARG
         httpx $PROXY_ARG -l "$domain" --silent -srd "$response" > $live_target
     fi
 
