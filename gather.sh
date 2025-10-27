@@ -492,6 +492,7 @@ screenshot() {
     gowitness scan file -f $live_target --screenshot-fullpage --write-db  -q 2>>$log || true
 
     mv -f gowitness.sqlite3 $dir_name/screenshot/ 2>/dev/null || true
+    mv -f screenshots $dir_name/screenshot/ 2>/dev/null || true
 
     echo -e "${GREEN}[+] Screenshot taken. Results saved in:${NC}${CYAN}$dir_name/screenshot${NC}\n${YELLOW}Run ${CYAN}gowitness report server${NC}${YELLOW} for check the report${NC}"
 }
@@ -575,7 +576,7 @@ while getopts ":i:d:asmbp:" options; do
     b)
         b_flag=true
         ;;
-    p) # NEW: Gestione del proxy
+    p) 
         p_flag=true
         PROXY=${OPTARG}
         # Imposta l'argomento standard per la maggior parte dei tool (es. httpx, katana, nuclei)
