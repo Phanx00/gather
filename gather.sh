@@ -15,7 +15,7 @@ echo -e "${CYAN} \______| /__/     \__\  |__|     |__|  |__| |_______|| _| \`.__
 echo -e "${CYAN}                                                                   ${NC}";
 
 # --------------------------------------------------------
-# Variabili globali e default per DNS-safe behaviour
+# Global variables and defaults for DNS-safe behavior
 # --------------------------------------------------------
 katana_result="" # katana static finding
 targets="" # working file
@@ -46,15 +46,15 @@ dir_name=""
 log=""
 dns_result=""
 
-# DNS-safety settings (regolabili)
-DNS_CHUNK_SIZE=200    # linee per batch (split)
-DNS_CONCURRENCY=5     # concorrenza xargs (-P)
-DNS_PAUSE=0.5         # pausa (s) tra batch
-RESOLVERS_FILENAME="resolvers.txt" # verrà creato in $dir_name
+# DNS-safety settings 
+DNS_CHUNK_SIZE=200    # linee for  batch (split)
+DNS_CONCURRENCY=5     # concurrence xargs (-P)
+DNS_PAUSE=0.5         # pause (s) between  batch
+RESOLVERS_FILENAME="resolvers.txt" # created  in $dir_name
 
-# Variabili Proxy (modificate per essere gestite dal flag -p)
-PROXY="" # Memorizza l'indirizzo del proxy se fornito (es. socks5://127.0.0.1:9050)
-PROXY_ARG="" # Memorizza l'argomento proxy per i tool che usano -proxy
+# Proxy variables (modified to be managed by the -p flag)
+PROXY="" # Save the proxy address if provided (e.g., socks5://127.0.0.1:9050)
+PROXY_ARG="" #  Store the proxy argument for tools that use -proxy
 
 s_flag=false # flag for search subdomains
 m_flag=false # flag for use mapper
@@ -212,8 +212,7 @@ check_scope() {
 
      echo -e "${YELLOW}[-] Checking the scope${NC}"
      if [ -n "$ip" ]; then
-        # usa httpx + dnsx ma tramite throttled_dnsx per non sovraccaricare resolver
-        # assumiamo che $1 sia una lista di hosts/urls
+        # use httpx + dnsx but via throttled_dnsx to avoid overloading the resolver
         throttled_dnsx "$1" "$result_tmp"
 
         input_type=$(check_input_type "$ip")
@@ -346,7 +345,7 @@ retrive_params(){
 
         katana $PROXY_ARG --silent -f qurl -iqp -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -u "$url" -fx > "$targets_local"
         
-        # paramspider usa --proxy
+        # paramspider use --proxy
         local paramspider_proxy=""
         if [[ -n "$PROXY" ]]; then
             paramspider_proxy="--proxy $PROXY"
@@ -364,7 +363,7 @@ retrive_params(){
 
 nuclei_check() {
      echo -e "${YELLOW}[-] Start enumeration with Nuclei for live targets${NC}"
-     # USA PROXY_ARG
+     # USE PROXY_ARG
      nuclei $PROXY_ARG  --silent -ut >/dev/null 2>>$log || true
      while IFS= read -r url; do
         echo -e "${YELLOW}[-] Start enumeration for:${NC}${CYAN}$url${NC}"
@@ -579,7 +578,7 @@ while getopts ":i:d:asmbp:" options; do
     p) 
         p_flag=true
         PROXY=${OPTARG}
-        # Imposta l'argomento standard per la maggior parte dei tool (es. httpx, katana, nuclei)
+        # Set the default argument for most tools (e.g., httpx, katana, nuclei)
         PROXY_ARG="-proxy $PROXY" 
         ;;
     :)
